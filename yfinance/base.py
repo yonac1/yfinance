@@ -48,9 +48,10 @@ from .const import _BASE_URL_, _ROOT_URL_
 
 
 class TickerBase:
-    def __init__(self, ticker, proxy=None, session=None):
+    def __init__(self, ticker, proxy=None, session=None, headers=None):
         self.ticker = ticker.upper()
         self.session = session
+        self.headers = headers
         self.proxy = proxy
         self._history = None
         self._history_metadata = None
@@ -69,7 +70,7 @@ class TickerBase:
 
         # accept isin as ticker
         if utils.is_isin(self.ticker):
-            self.ticker = utils.get_ticker_by_isin(self.ticker, proxy, session)
+            self.ticker = utils.get_ticker_by_isin(self.ticker, proxy, session, headers)
 
         self._data: YfData = YfData(session=session)
 

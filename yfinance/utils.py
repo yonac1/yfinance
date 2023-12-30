@@ -184,12 +184,12 @@ def is_isin(string):
     return bool(_re.match("^([A-Z]{2})([A-Z0-9]{9})([0-9])$", string))
 
 
-def get_all_by_isin(isin, proxy=None, session=None):
+def get_all_by_isin(isin, proxy=None, session=None, headers=None):
     if not (is_isin(isin)):
         raise ValueError("Invalid ISIN number")
-    session = session or _requests
+    session = session
     url = f"{_BASE_URL_}/v1/finance/search?q={isin}"
-    data = session.get(url=url, proxies=proxy, headers=user_agent_headers)
+    data = session.get(url=url, proxies=proxy, headers=headers)
     try:
         data = data.json()
         ticker = data.get('quotes', [{}])[0]
@@ -207,18 +207,18 @@ def get_all_by_isin(isin, proxy=None, session=None):
         return {}
 
 
-def get_ticker_by_isin(isin, proxy=None, session=None):
-    data = get_all_by_isin(isin, proxy, session)
+def get_ticker_by_isin(isin, proxy=None, session=None, headers=None):
+    data = get_all_by_isin(isin, proxy, session, headers)
     return data.get('ticker', {}).get('symbol', '')
 
 
-def get_info_by_isin(isin, proxy=None, session=None):
-    data = get_all_by_isin(isin, proxy, session)
+def get_info_by_isin(isin, proxy=None, session=None, headers=None):
+    data = get_all_by_isin(isin, proxy, session, headers)
     return data.get('ticker', {})
 
 
-def get_news_by_isin(isin, proxy=None, session=None):
-    data = get_all_by_isin(isin, proxy, session)
+def get_news_by_isin(isin, proxy=None, session=None, headers=None):
+    data = get_all_by_isin(isin, proxy, session, headers)
     return data.get('news', {})
 
 
