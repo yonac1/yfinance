@@ -22,6 +22,8 @@
 from __future__ import print_function
 
 import datetime as _datetime
+import json
+import random
 from io import StringIO
 import json as _json
 import logging
@@ -64,9 +66,23 @@ class TickerBase:
         self._earnings = None
         self._financials = None
 
+        with open('proxy_list.json', 'r') as file:
+            self.proxy_list = json.load(file)
+
+        # Choose a random proxy from the list
+        proxy = random.choice(self.proxy_list)
+
+        # Construct the proxy URL
+        proxy_url = f"{proxy['protocols'][0]}://{proxy['ip']}:{proxy['port']}"
+
+        # Set up the proxy for requests
+        proxies = {
+            proxy['protocols'][0]: proxy_url,
+        }
+
         # accept isin as ticker
         if utils.is_isin(self.ticker):
-            self.ticker = utils.get_ticker_by_isin(self.ticker, None, session)
+            self.ticker = utils.get_ticker_by_isin(self.ticker, proxies, session)
 
         self._data: YfData = YfData(session=session)
 
@@ -135,10 +151,12 @@ class TickerBase:
 
         if debug is not None:
             if debug:
-                utils.print_once(f"yfinance: Ticker.history(debug={debug}) argument is deprecated and will be removed in future version. Do this instead: logging.getLogger('yfinance').setLevel(logging.ERROR)")
+                utils.print_once(
+                    f"yfinance: Ticker.history(debug={debug}) argument is deprecated and will be removed in future version. Do this instead: logging.getLogger('yfinance').setLevel(logging.ERROR)")
                 logger.setLevel(logging.ERROR)
             else:
-                utils.print_once(f"yfinance: Ticker.history(debug={debug}) argument is deprecated and will be removed in future version. Do this instead to suppress error messages: logging.getLogger('yfinance').setLevel(logging.CRITICAL)")
+                utils.print_once(
+                    f"yfinance: Ticker.history(debug={debug}) argument is deprecated and will be removed in future version. Do this instead to suppress error messages: logging.getLogger('yfinance').setLevel(logging.CRITICAL)")
                 logger.setLevel(logging.CRITICAL)
 
         start_user = start
@@ -361,11 +379,14 @@ class TickerBase:
         if not intraday:
             # If localizing a midnight during DST transition hour when clocks roll back,
             # meaning clock hits midnight twice, then use the 2nd (ambiguous=True)
-            quotes.index = pd.to_datetime(quotes.index.date).tz_localize(tz_exchange, ambiguous=True, nonexistent='shift_forward')
+            quotes.index = pd.to_datetime(quotes.index.date).tz_localize(tz_exchange, ambiguous=True,
+                                                                         nonexistent='shift_forward')
             if dividends.shape[0] > 0:
-                dividends.index = pd.to_datetime(dividends.index.date).tz_localize(tz_exchange, ambiguous=True, nonexistent='shift_forward')
+                dividends.index = pd.to_datetime(dividends.index.date).tz_localize(tz_exchange, ambiguous=True,
+                                                                                   nonexistent='shift_forward')
             if splits.shape[0] > 0:
-                splits.index = pd.to_datetime(splits.index.date).tz_localize(tz_exchange, ambiguous=True, nonexistent='shift_forward')
+                splits.index = pd.to_datetime(splits.index.date).tz_localize(tz_exchange, ambiguous=True,
+                                                                             nonexistent='shift_forward')
 
         # Combine
         df = quotes.sort_index()
@@ -392,8 +413,9 @@ class TickerBase:
 
         df = df[~df.index.duplicated(keep='first')]  # must do before repair
 
-        if isinstance(repair, str) and repair=='silent':
-            utils.log_once(logging.WARNING, f"yfinance: Ticker.history(repair='silent') value is deprecated and will be removed in future version. Repair now silent by default, use logging module to increase verbosity.")
+        if isinstance(repair, str) and repair == 'silent':
+            utils.log_once(logging.WARNING,
+                           f"yfinance: Ticker.history(repair='silent') value is deprecated and will be removed in future version. Repair now silent by default, use logging module to increase verbosity.")
             repair = True
         if repair:
             # Do this before auto/back adjust
@@ -492,7 +514,8 @@ class TickerBase:
         if self._reconstruct_start_interval is None:
             self._reconstruct_start_interval = interval
         if interval != self._reconstruct_start_interval and interval != nexts[self._reconstruct_start_interval]:
-            logger.debug(f"{self.ticker}: Price repair has hit max depth of 2 ('%s'->'%s'->'%s')", self._reconstruct_start_interval, nexts[self._reconstruct_start_interval], interval)
+            logger.debug(f"{self.ticker}: Price repair has hit max depth of 2 ('%s'->'%s'->'%s')",
+                         self._reconstruct_start_interval, nexts[self._reconstruct_start_interval], interval)
             return df
 
         df = df.sort_index()
@@ -630,7 +653,8 @@ class TickerBase:
             if min_dt is not None:
                 fetch_start = max(min_dt.date(), fetch_start)
             logger.debug(f"Fetching {sub_interval} prepost={prepost} {fetch_start}->{fetch_end}")
-            df_fine = self.history(start=fetch_start, end=fetch_end, interval=sub_interval, auto_adjust=False, actions=True, prepost=prepost, repair=True, keepna=True)
+            df_fine = self.history(start=fetch_start, end=fetch_end, interval=sub_interval, auto_adjust=False,
+                                   actions=True, prepost=prepost, repair=True, keepna=True)
             if df_fine is None or df_fine.empty:
                 msg = f"Cannot reconstruct {interval} block starting"
                 if intraday:
@@ -890,7 +914,7 @@ class TickerBase:
         ratio = df2_data / median
         ratio_rounded = (ratio / 20).round() * 20  # round ratio to nearest 20
         f = ratio_rounded == 100
-        ratio_rcp = 1.0/ratio
+        ratio_rcp = 1.0 / ratio
         ratio_rcp_rounded = (ratio_rcp / 20).round() * 20  # round ratio to nearest 20
         f_rcp = (ratio_rounded == 100) | (ratio_rcp_rounded == 100)
         f_either = f | f_rcp
@@ -927,11 +951,13 @@ class TickerBase:
                     if fi[j]:
                         df2.loc[idx, c] = df.loc[idx, c] * 0.01
 
-                c = "High" ; j = data_cols.index(c)
+                c = "High";
+                j = data_cols.index(c)
                 if fi[j]:
                     df2.loc[idx, c] = df2.loc[idx, ["Open", "Close"]].max()
 
-                c = "Low" ; j = data_cols.index(c)
+                c = "Low";
+                j = data_cols.index(c)
                 if fi[j]:
                     df2.loc[idx, c] = df2.loc[idx, ["Open", "Close"]].min()
 
@@ -947,11 +973,13 @@ class TickerBase:
                     if fi[j]:
                         df2.loc[idx, c] = df.loc[idx, c] * 100.0
 
-                c = "High" ; j = data_cols.index(c)
+                c = "High";
+                j = data_cols.index(c)
                 if fi[j]:
                     df2.loc[idx, c] = df2.loc[idx, ["Open", "Close"]].max()
 
-                c = "Low" ; j = data_cols.index(c)
+                c = "Low";
+                j = data_cols.index(c)
                 if fi[j]:
                     df2.loc[idx, c] = df2.loc[idx, ["Open", "Close"]].min()
 
@@ -1190,7 +1218,7 @@ class TickerBase:
 
         if df.empty:
             return df
-            
+
         logger = utils.get_yf_logger()
 
         interday = interval in ['1d', '1wk', '1mo', '3mo']
@@ -1218,7 +1246,7 @@ class TickerBase:
     def _fix_prices_sudden_change(self, df, interval, tz_exchange, change, correct_volume=False):
         if df.empty:
             return df
-            
+
         logger = utils.get_yf_logger()
 
         df = df.sort_index(ascending=False)
@@ -1255,9 +1283,9 @@ class TickerBase:
         # If stock is currently suspended and not in USA, then usually Yahoo introduces
         # 100x errors into suspended intervals. Clue is no price change and 0 volume.
         # Better to use last active trading interval as baseline.
-        f_no_activity = (df2['Low'] == df2['High']) & (df2['Volume']==0)
+        f_no_activity = (df2['Low'] == df2['High']) & (df2['Volume'] == 0)
         f_no_activity = f_no_activity | df2[OHLC].isna().all(axis=1)
-        appears_suspended = f_no_activity.any() and np.where(f_no_activity)[0][0]==0
+        appears_suspended = f_no_activity.any() and np.where(f_no_activity)[0][0] == 0
         f_active = ~f_no_activity
         idx_latest_active = np.where(f_active & np.roll(f_active, 1))[0]
         if len(idx_latest_active) == 0:
@@ -1283,7 +1311,7 @@ class TickerBase:
             # Avoid using 'Low' and 'High'. For multiday intervals, these can be 
             # very volatile so reduce ability to detect genuine stock split errors
             _1d_change_x = np.full((n, 2), 1.0)
-            price_data = df2[['Open','Close']].to_numpy()
+            price_data = df2[['Open', 'Close']].to_numpy()
             f_zero = price_data == 0.0
         else:
             _1d_change_x = np.full((n, 4), 1.0)
@@ -1296,7 +1324,7 @@ class TickerBase:
         # Fix = use adjusted prices
         adj = df2['Adj Close'].to_numpy() / df2['Close'].to_numpy()
         for j in range(price_data.shape[1]):
-            price_data[:,j] *= adj
+            price_data[:, j] *= adj
 
         _1d_change_x[1:] = price_data[1:, ] / price_data[:-1, ]
         f_zero_num_denom = f_zero | np.roll(f_zero, 1, axis=0)
@@ -1320,7 +1348,8 @@ class TickerBase:
 
         # If all 1D changes are closer to 1.0 than split, exit
         split_max = max(split, split_rcp)
-        if np.max(_1d_change_minx) < (split_max - 1) * 0.5 + 1 and np.min(_1d_change_minx) > 1.0 / ((split_max - 1) * 0.5 + 1):
+        if np.max(_1d_change_minx) < (split_max - 1) * 0.5 + 1 and np.min(_1d_change_minx) > 1.0 / (
+                (split_max - 1) * 0.5 + 1):
             logger.info(f"price-repair-split: No {fix_type}s detected")
             return df
 
@@ -1335,7 +1364,8 @@ class TickerBase:
         sd = np.std(_1d_change_minx[f])
         # Now can calculate SD as % of mean
         sd_pct = sd / avg
-        logger.debug(f"price-repair-split: Estimation of true 1D change stats: mean = {avg:.2f}, StdDev = {sd:.4f} ({sd_pct*100.0:.1f}% of mean)")
+        logger.debug(
+            f"price-repair-split: Estimation of true 1D change stats: mean = {avg:.2f}, StdDev = {sd:.4f} ({sd_pct * 100.0:.1f}% of mean)")
 
         # Only proceed if split adjustment far exceeds normal 1D changes
         largest_change_pct = 5 * sd_pct
@@ -1395,7 +1425,6 @@ class TickerBase:
                         df_debug[c + '_f_up'] = f_up[:, j]
                         df_debug[c + '_r'] = df_debug[c + '_r'].round(2).astype('str')
 
-
         if not f.any():
             logger.info(f'price-repair-split: No {fix_type}s detected')
             return df
@@ -1432,9 +1461,12 @@ class TickerBase:
         def map_signals_to_ranges(f, f_up, f_down):
             # Ensure 0th element is False, because True is nonsense
             if f[0]:
-                f = np.copy(f) ; f[0] = False
-                f_up = np.copy(f_up) ; f_up[0] = False
-                f_down = np.copy(f_down) ; f_down[0] = False
+                f = np.copy(f);
+                f[0] = False
+                f_up = np.copy(f_up);
+                f_up[0] = False
+                f_down = np.copy(f_down);
+                f_down[0] = False
 
             if not f.any():
                 return []
@@ -1461,7 +1493,8 @@ class TickerBase:
 
         if idx_latest_active is not None:
             idx_rev_latest_active = df.shape[0] - 1 - idx_latest_active
-            logger.debug(f'price-repair-split: idx_latest_active={idx_latest_active}, idx_rev_latest_active={idx_rev_latest_active}')
+            logger.debug(
+                f'price-repair-split: idx_latest_active={idx_latest_active}, idx_rev_latest_active={idx_rev_latest_active}')
         if correct_columns_individually:
             f_corrected = np.full(n, False)
             if correct_volume:
@@ -1487,7 +1520,8 @@ class TickerBase:
                     fj = f[:, j]
                     f_upj = f_up[:, j]
                     f_downj = f_down[:, j]
-                    ranges_before = map_signals_to_ranges(fj[idx_latest_active:], f_upj[idx_latest_active:], f_downj[idx_latest_active:])
+                    ranges_before = map_signals_to_ranges(fj[idx_latest_active:], f_upj[idx_latest_active:],
+                                                          f_downj[idx_latest_active:])
                     if len(ranges_before) > 0:
                         # Shift each range back to global indexing
                         for i in range(len(ranges_before)):
@@ -1496,7 +1530,9 @@ class TickerBase:
                     f_rev_downj = np.flip(np.roll(f_upj, -1))  # correct
                     f_rev_upj = np.flip(np.roll(f_downj, -1))  # correct
                     f_revj = f_rev_upj | f_rev_downj
-                    ranges_after = map_signals_to_ranges(f_revj[idx_rev_latest_active:], f_rev_upj[idx_rev_latest_active:], f_rev_downj[idx_rev_latest_active:])
+                    ranges_after = map_signals_to_ranges(f_revj[idx_rev_latest_active:],
+                                                         f_rev_upj[idx_rev_latest_active:],
+                                                         f_rev_downj[idx_rev_latest_active:])
                     if len(ranges_after) > 0:
                         # Shift each range back to global indexing:
                         for i in range(len(ranges_after)):
@@ -1505,17 +1541,19 @@ class TickerBase:
                         # Flip range to normal ordering
                         for i in range(len(ranges_after)):
                             r = ranges_after[i]
-                            ranges_after[i] = (n-r[1], n-r[0], r[2])
-                    ranges = ranges_before ; ranges.extend(ranges_after)
+                            ranges_after[i] = (n - r[1], n - r[0], r[2])
+                    ranges = ranges_before;
+                    ranges.extend(ranges_after)
                 else:
                     ranges = map_signals_to_ranges(f[:, j], f_up[:, j], f_down[:, j])
                 logger.debug(f"column '{c}' ranges: {ranges}")
                 if start_min is not None:
                     # Prune ranges that are older than start_min
-                    for i in range(len(ranges)-1, -1, -1):
+                    for i in range(len(ranges) - 1, -1, -1):
                         r = ranges[i]
                         if df.index[r[0]].date() < start_min:
-                            logger.debug(f'price-repair-split: Pruning {c} range {df.index[r[0]]}->{df.index[r[1]-1]} because too old.')
+                            logger.debug(
+                                f'price-repair-split: Pruning {c} range {df.index[r[0]]}->{df.index[r[1] - 1]} because too old.')
                             del ranges[i]
 
                 if len(ranges) > 0:
@@ -1529,7 +1567,8 @@ class TickerBase:
                 idxs = [i if OHLC_correct_ranges[i] else -1 for i in range(len(OHLC))]
                 idx = np.where(np.array(idxs) != -1)[0][0]
                 col = OHLC[idx]
-                logger.debug(f'price-repair-split: Potential {fix_type} detected only in column {col}, so treating as false positive (ignore)')
+                logger.debug(
+                    f'price-repair-split: Potential {fix_type} detected only in column {col}, so treating as false positive (ignore)')
             else:
                 # Only correct if at least 2 columns require correction.
                 for j in range(len(OHLC)):
@@ -1539,13 +1578,17 @@ class TickerBase:
                         ranges = []
                     for r in ranges:
                         if r[2] == 'split':
-                            m = split ; m_rcp = split_rcp
+                            m = split;
+                            m_rcp = split_rcp
                         else:
-                            m = split_rcp ; m_rcp = split
+                            m = split_rcp;
+                            m_rcp = split
                         if interday:
-                            logger.info(f"price-repair-split: Corrected {fix_type} on col={c} range=[{df2.index[r[1]-1].date()}:{df2.index[r[0]].date()}] m={m:.4f}")
+                            logger.info(
+                                f"price-repair-split: Corrected {fix_type} on col={c} range=[{df2.index[r[1] - 1].date()}:{df2.index[r[0]].date()}] m={m:.4f}")
                         else:
-                            logger.info(f"price-repair-split: Corrected {fix_type} on col={c} range=[{df2.index[r[1]-1]}:{df2.index[r[0]]}] m={m:.4f}")
+                            logger.info(
+                                f"price-repair-split: Corrected {fix_type} on col={c} range=[{df2.index[r[1] - 1]}:{df2.index[r[0]]}] m={m:.4f}")
                         df2.iloc[r[0]:r[1], df2.columns.get_loc(c)] *= m
                         if c == 'Close':
                             df2.iloc[r[0]:r[1], df2.columns.get_loc('Adj Close')] *= m
@@ -1574,7 +1617,8 @@ class TickerBase:
                 # 2: process data after suspension in index-descending order. Requires signals to be reversed, 
                 #    then returned ranges to also be reversed, because this logic was originally written for
                 #    index-ascending (date-descending) order.
-                ranges_before = map_signals_to_ranges(f[idx_latest_active:], f_up[idx_latest_active:], f_down[idx_latest_active:])
+                ranges_before = map_signals_to_ranges(f[idx_latest_active:], f_up[idx_latest_active:],
+                                                      f_down[idx_latest_active:])
                 if len(ranges_before) > 0:
                     # Shift each range back to global indexing
                     for i in range(len(ranges_before)):
@@ -1583,7 +1627,8 @@ class TickerBase:
                 f_rev_down = np.flip(np.roll(f_up, -1))
                 f_rev_up = np.flip(np.roll(f_down, -1))
                 f_rev = f_rev_up | f_rev_down
-                ranges_after = map_signals_to_ranges(f_rev[idx_rev_latest_active:], f_rev_up[idx_rev_latest_active:], f_rev_down[idx_rev_latest_active:])
+                ranges_after = map_signals_to_ranges(f_rev[idx_rev_latest_active:], f_rev_up[idx_rev_latest_active:],
+                                                     f_rev_down[idx_rev_latest_active:])
                 if len(ranges_after) > 0:
                     # Shift each range back to global indexing:
                     for i in range(len(ranges_after)):
@@ -1592,22 +1637,26 @@ class TickerBase:
                     # Flip range to normal ordering
                     for i in range(len(ranges_after)):
                         r = ranges_after[i]
-                        ranges_after[i] = (n-r[1], n-r[0], r[2])
-                ranges = ranges_before ; ranges.extend(ranges_after)
+                        ranges_after[i] = (n - r[1], n - r[0], r[2])
+                ranges = ranges_before;
+                ranges.extend(ranges_after)
             else:
                 ranges = map_signals_to_ranges(f, f_up, f_down)
             if start_min is not None:
                 # Prune ranges that are older than start_min
-                for i in range(len(ranges)-1, -1, -1):
+                for i in range(len(ranges) - 1, -1, -1):
                     r = ranges[i]
                     if df.index[r[0]].date() < start_min:
-                        logger.debug(f'price-repair-split: Pruning range {df.index[r[0]]}->{df.index[r[1]-1]} because too old.')
+                        logger.debug(
+                            f'price-repair-split: Pruning range {df.index[r[0]]}->{df.index[r[1] - 1]} because too old.')
                         del ranges[i]
             for r in ranges:
                 if r[2] == 'split':
-                    m = split ; m_rcp = split_rcp
+                    m = split;
+                    m_rcp = split_rcp
                 else:
-                    m = split_rcp ; m_rcp = split
+                    m = split_rcp;
+                    m_rcp = split
                 logger.debug(f"price-repair-split: range={r} m={m}")
                 for c in ['Open', 'High', 'Low', 'Close', 'Adj Close']:
                     df2.iloc[r[0]:r[1], df2.columns.get_loc(c)] *= m
@@ -1632,7 +1681,7 @@ class TickerBase:
         if correct_volume:
             f_na = df2['Volume'].isna()
             if f_na.any():
-                df2.loc[~f_na,'Volume'] = df2['Volume'][~f_na].round(0).astype('int')
+                df2.loc[~f_na, 'Volume'] = df2['Volume'][~f_na].round(0).astype('int')
             else:
                 df2['Volume'] = df2['Volume'].round(0).astype('int')
 
@@ -1743,7 +1792,8 @@ class TickerBase:
 
     @property
     def basic_info(self):
-        warnings.warn("'Ticker.basic_info' is renamed to 'Ticker.fast_info', hopefully purpose is clearer", DeprecationWarning)
+        warnings.warn("'Ticker.basic_info' is renamed to 'Ticker.fast_info', hopefully purpose is clearer",
+                      DeprecationWarning)
         return self.fast_info
 
     def get_sustainability(self, proxy=None, as_dict=False):

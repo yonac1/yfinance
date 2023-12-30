@@ -28,7 +28,6 @@ import pandas as _pd
 
 from .base import TickerBase
 
-
 class Ticker(TickerBase):
     def __init__(self, ticker, session=None):
         super(Ticker, self).__init__(ticker, session=session)
