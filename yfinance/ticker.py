@@ -29,8 +29,8 @@ import pandas as _pd
 from .base import TickerBase
 
 class Ticker(TickerBase):
-    def __init__(self, ticker, session=None):
-        super(Ticker, self).__init__(ticker, session=session)
+    def __init__(self, ticker, proxy=None, session=None):
+        super(Ticker, self).__init__(ticker, proxy=proxy, session=session)
         self._expirations = {}
         self._underlying  = {}
 

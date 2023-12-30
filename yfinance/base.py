@@ -48,9 +48,10 @@ from .const import _BASE_URL_, _ROOT_URL_
 
 
 class TickerBase:
-    def __init__(self, ticker, session=None):
+    def __init__(self, ticker, proxy=None, session=None):
         self.ticker = ticker.upper()
         self.session = session
+        self.proxy = proxy
         self._history = None
         self._history_metadata = None
         self._history_metadata_formatted = False
@@ -66,23 +67,9 @@ class TickerBase:
         self._earnings = None
         self._financials = None
 
-        with open('proxy_list.json', 'r') as file:
-            self.proxy_list = json.load(file)
-
-        # Choose a random proxy from the list
-        proxy = random.choice(self.proxy_list)
-
-        # Construct the proxy URL
-        proxy_url = f"{proxy['protocols'][0]}://{proxy['ip']}:{proxy['port']}"
-
-        # Set up the proxy for requests
-        proxies = {
-            proxy['protocols'][0]: proxy_url,
-        }
-
         # accept isin as ticker
         if utils.is_isin(self.ticker):
-            self.ticker = utils.get_ticker_by_isin(self.ticker, proxies, session)
+            self.ticker = utils.get_ticker_by_isin(self.ticker, proxy, session)
 
         self._data: YfData = YfData(session=session)
 
